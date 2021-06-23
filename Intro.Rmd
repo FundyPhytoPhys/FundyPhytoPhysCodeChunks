@@ -1,0 +1,12 @@
+---
+title: "Time, Tide, Light, Sentinel"
+output:
+  bookdown::html_document2
+
+bibliography: ../FundyMudflatDiatoms.bib
+csl: plos-one.csl
+---
+
+### Introduction  {-}  
+We can write an introduction (or other) section as an independent .Rmd, and then import it into the main document.
+https://bookdown.org/yihui/rmarkdown-cookbook/child-document.html
