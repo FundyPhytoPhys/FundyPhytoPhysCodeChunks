@@ -1,0 +1,32 @@
+print("FundyPhytoFunctions")
+
+print("load tidyverse to accommodate function dependencies")
+library(tidyverse)
+
+print("read_plus_csv is a function of 'Flnm', the name of the file to be read, and 'Skp' the number of rows to skip at the top of the file, with a default = 0. read_plus_csv uses read_csv to read in 'Flnm' then pipes the resulting dataframe directly to mutate to add a column 'Filename' with value set equal to Flnm for each row derived from Flnm")
+
+read_plus_csv = function(Flnm, Skp = 0) {read_csv(flnm, skip = Skp) %>% mutate(Filename = flnm)
+}
+
+print("data_with_sources is a function of 'DataPath', the folder (directory) that contains files with a 'Patt' character string stored in 'Patt' in their name,  to be read in, and '
+Skp', the number of rows to skip at the top of each file, with a default = 0. data_with_sources uses list.files to generate a list of all files in 'DataPath' that contain pattern with a default of '*.csv'. data_with_sources pipes the resulting list of filenames to the purrr::map_df function which uses read_plus_csv to read in each filename, with Skp = 0 as the default.")
+
+data_with_sources_csv = function(DataPath, Patt = "*.csv", Skp = 0) {list.files(path = DataPath, Patt = "*.csv",full.names = T) %>% map_df(~read_plus_csv(Flnm = ., Skp  = Skp ))
+}
+
+print("define a linear equation; x will be taken from E_hours when running the fit")
+linear_eqn <- function(x, Intercept, Slope){intercept + (Slope*x)
+}
+
+print("define an exponential equation; x will be taken from E_hours when running the fit")
+exp_eqn <- function(x, Intercept, Mu){Intercept * exp(Mu*x)
+}
+
+print("define a logistic equation. x will be taken from 'E_hours' when  running the fit.")
+logistic_eqn <- function(x, Pmax, Mu, Intercept){(Pmax*Intercept*exp(Mu*x))/(Pmax + (Intercept*(exp(Mu*x)-1)))
+}
+
+print("define a the Modified Gompertz equation, x will be taken from 'E_hours' when running the fit. https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0178691
+eqn. 14")
+gompertz_eqn <- function(x, Pmax, Mu, Intercept){pmax*((Intercept/Pmax)^exp(-Mu*x))}
+

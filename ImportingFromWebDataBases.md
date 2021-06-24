@@ -1,6 +1,6 @@
 ---
 title: "Importing From Web Databases"
-date: "2021-06-23"
+date: "2021-06-24"
 author:
 - Emma Sutherland^1^
 - Douglas Campbell^1^*
@@ -12,13 +12,21 @@ output:
     toc_float: TRUE
     toc_depth: 6
     fig_caption: yes
-
 bibliography: RPackageCitations.bib
 csl: plos-one.csl
 editor_options: 
   markdown: 
     wrap: 72
+
 ---
+<style type="text/css">
+p.caption {
+  font-size: 18px;
+}
+</style>
+
+
+
 
 # Affiliations {-}
 ^1^Mount Allison University, New Brunswick, Canada  
@@ -26,15 +34,17 @@ editor_options:
 *corresponding author  
 
 # Acknowledgements {-}
-ES was supported by the New Brunswick Wildlife Trust Fund and a Cleantech Internship.DAC was supported by the Canada Research Chairs.
+Brackets minus after header excludes header from numbering.  
+ES was supported by the New Brunswick Wildlife Trust Fund and a Cleantech Internship.  
+DAC was supported by the Canada Research Chairs.
 
 # Overview
 There are packages to support direct import from specific web data bases into R.
 These packages streamline the general 'web scraping' processes, that can also be written from scratch.
 
-Script based import supports: 
--reproducible auditing of import processes
--higher throughput than cutting and pasting
+Script based import supports:  
+-reproducible auditing of import processes  
+-higher throughput than cutting and pasting  
 -fewer typographic errors
 
 ## Call a different .Rmd as a 'child' upon Knit.
@@ -67,13 +77,10 @@ Upon knitr figures will be saved to 'Figs/'
 
 
 ## Set Project Variables  
-Try to set all user-defined variables near top of .Rmd, in one place, to avoid or limit editing of downstream code.
+Try to set all user-defined variables near top of .Rmd, in one place, to avoid or limit editing of downstream code.  
 Assigning project-specific values to generic variables helps with re-use of code.
 
 ```r
-Plots <- c("Plots")
-DataIn <- c("DataIn")
-
 EnCanStation <- "NAPPAN AUTO"
 Sites <- c("Avonport","Danielsflats","GrandeAnse","Joggins","MarysPoint", "PecksCove")
 Latitude <- 45.75
@@ -86,22 +93,6 @@ Drone_kph <- 20
 TrimStart <- 20200401000000
 TrimEnd <- 20200501000000
 TideTolerance <- 5
-```
-
-## Import Sampling MetaData from GoogleSheet
-MetaData in a GoogleSheet is more generic than a project-specific .csv edited and saved locally.
-The GoogleSheet interface can be tricky.
-Repeatedly reading from GoogleDrive can provoke a throttle from Google.
-
-
-## MetaData Transforms
-
-```r
-MetaData <- MetaData  %>%
-  unite(col = MudDateTime, YYYYMMDD, HHMM_Mud, sep = "", remove = FALSE) %>%
-  mutate(MudDateTime = ymd_hm(MudDateTime)) %>%
-  unite(col = SpecDateTime, YYYYMMDD, HHMM_Spectrum, sep = "", remove = FALSE) %>%
-  mutate(SpecDateTime = ymd_hm(SpecDateTime))
 ```
 
 # Results
@@ -125,13 +116,9 @@ StationNames
 ## #   normals <lgl>, normals_1981_2010 <lgl>, normals_1971_2000 <lgl>
 ```
 
-```r
-StationNames$station_id[1]
-```
+StationID 42083 based upon search for NAPPAN AUTO.  
 
-```
-## [1] 42083
-```
+
 
 ## Download Environment Canada weather data
 
@@ -157,56 +144,12 @@ NappanTempPlot_cap <- "Temperature vs. Date at the Nappan Automated Weather Stat
 ```
 
 
-For display as formatted .md on GitHub any chunks generating figures have to be a singleword chunk name
-
-```r
-NappanTempPlot <- NappanWeather %>% 
-  ggplot() +
-  geom_line(aes(x = time, y = temp),size = 0.2) +
-  theme_bw()
-```
-
+For display as formatted .md on GitHub any chunks generating figures have to be a singleword chunk name.
+Keep name of Chunk the same as name of Figure for in-line citations of numbered figures to work.
 <div class="figure">
-<img src="Figs/tempplot, tempplot-1.png" alt="Temperature vs. Date at the Nappan Automated Weather Station"  />
-<p class="caption">(\#fig:tempplot, tempplot)Temperature vs. Date at the Nappan Automated Weather Station</p>
+<img src="Figs/NappanTempPlot-1.png" alt="Temperature vs. Date at the Nappan Automated Weather Station"  />
+<p class="caption">(\#fig:NappanTempPlot)Temperature vs. Date at the Nappan Automated Weather Station</p>
 </div>
-
-## Other WeatherPlots
-
-```r
-NappanRain <- NappanWeatherDay %>% 
-  ggplot() +
-  geom_line(aes(x = date, y = total_precip),size = 0.2) +
-  theme_bw()
-
-NappanRain 
-```
-
-![](Figs/weatherplots-1.png)<!-- -->
-
-```r
-NappanWind <- NappanWeather %>% 
-  ggplot() +
-  geom_line(aes(x = date, y = wind_spd),size = 0.2) +
-  geom_hline (aes(yintercept = Drone_kph)) +
-  theme_bw()
-
-NappanWind
-```
-
-![](Figs/weatherplots-2.png)<!-- -->
-
-```r
-NappanGust <- NappanWeatherDay %>% 
-  ggplot() +
-  geom_line(aes(x = date, y = spd_max_gust),size = 0.2) +
-  geom_hline (aes(yintercept = Drone_kph)) +
-  theme_bw()
-
-NappanGust
-```
-
-![](Figs/weatherplots-3.png)<!-- -->
 
 
 # Discussion
@@ -214,7 +157,7 @@ NappanGust
 In line reference to Figure \@ref(fig:NappanTempPlot)  
 
 This works if Figure Captions are set up properly for knitting using bookdown.
-The advantage is dynamic (re)numbering of figures.  
+The advantage is dynamic (re)numbering of figures in the knit output.
 
 \newpage
 ### List of Figure Captions {-}
@@ -222,8 +165,7 @@ The advantage is dynamic (re)numbering of figures.
 Figure \@ref(fig:NappanTempPlot)
 Temperature vs. Date at the Nappan Automated Weather Station  
 
-This only works if Figure Captions are set up properly for knitting using bookdown.
-The advantage is dynamic (re)numbering of figures.
+In line call to R object 'NappanTempPlot'.
 
 \newpage
 
