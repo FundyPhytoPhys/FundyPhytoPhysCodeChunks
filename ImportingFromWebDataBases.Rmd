@@ -34,7 +34,7 @@ p.caption {
 *corresponding author  
 
 # Acknowledgements {-}
-Brackets minus after header excludes header from numbering.  
+Brackets minus after heading excludes heading from numbering.  
 ES was supported by the New Brunswick Wildlife Trust Fund and a Cleantech Internship.  
 DAC was supported by the Canada Research Chairs.
 
