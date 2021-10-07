@@ -1,0 +1,68 @@
+---
+title: "My Wonderful Presentation not on PowerPoint"
+author: "Sally Scientist"
+date: "`r format(Sys.Date())`"
+output:
+  slidy_presentation:
+    footer: Sally Scientist; Mount Allison University BIOL4950
+  beamer_presentation: default
+csl: plos-one.csl
+bibliography: SallysCitations.bib
+---
+
+```{r setup, include=FALSE}
+#content of this chunk will run upon knit but the chunk itself will not appear
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(ggplot2)
+
+figures <- c("figures")
+ #data_in <- c("data_in")
+ #process_data <- c("process_data")
+figures_in <- c("figure_material")
+```
+
+## R Markdown
+
+This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com> or <http://data-analytics.net/cep/Schedule_files/presentations_demo.html>
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+
+## Slide with Bullets
+
+- RNotebooks are interactive
+- RNotebooks can be knit to formatted output
+- RMarkdown can be knit to 'slidy' presentation slides
+- RMarkdown can interface with a 'Shiny' interactive web application 
+
+## Slide with Bullets and Citations drawn from a .bibtex exported from Zoter
+
+- RNotebooks are interactive [@xiaSynechococcusAssemblagesSalinity2017]
+- RNotebooks can be knit to formatted output
+- RMarkdown can be knit to 'slidy' presentation slides
+- RMarkdown can interface with a 'Shiny' interactive web application 
+
+
+## Slide with R Output
+
+Try adding 'include = FALSE'
+
+```{r cars, echo = TRUE}
+summary(cars)
+```
+
+## Slide with Plot
+
+```{r pressure}
+plot(pressure)
+```
+
+## Slide with an imported image saved in the same folder as the .Rmd
+
+```{r 20200403_estuary_schematic, fig.align = 'centre', out.width='70%', out.height='70%'}
+knitr::include_graphics(file.path("figure_material/20200403_estuary_schematic.png"))
+```
+
+
+## Bibliography
