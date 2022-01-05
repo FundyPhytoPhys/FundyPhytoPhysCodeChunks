@@ -1,0 +1,74 @@
+---
+title: "ExperimentalGrowthMatrixGenerator"
+author:
+- Douglas A. Campbell:
+    institute: mta
+    email: dcampbel@mta.ca
+    correspondence: TRUE
+institute:
+  - mta: 'Department of Biology, Mount Allison University, Sackville NB, Canada, E4L1G7'
+
+date: "`r format(Sys.Date())`"
+output:
+bookdown::html_document2:
+    code_folding: show
+    keep_md: yes
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 6
+    fig_caption: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+# Set Chunk Options {}
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(googledrive)
+library(googlesheets4)
+googlesheets4::gs4_deauth() #turn off requirement for google log in, requires googlesheets to be set for 'anyone with link' 
+
+```
+
+# Generate Dataframe of all possible combinations of a set of variables, each with multiple values.
+There are probably better ways to do this
+```{r matrix setup, include = FALSE}
+#generate mini-dataframes for values of each variable
+Strains <- tibble(Strains = c("MED4", "SS120", "MIT9313"))
+PAR_ue <- tibble(PAR_ue = c(15, 30, 90, 180))
+O2 <- tibble(O2_umolL = c(0, 270))
+Photoperiod <- tibble(Photoperiod_h = c(4, 8, 12, 16))
+Colour <- tibble(Colour = c("WW", "Blue", "Green", "Red"))
+PhotoPattern <- tibble(PhotoPattern = c("Sine"))
+
+#iteratively build up ExpMatrix dataframe; by = character() gives all possible combinations of values of the variables
+ExpMatrix <- left_join(x = Strains, y = PAR_ue, by = character())
+ExpMatrix <- left_join(x = ExpMatrix, y = O2, by = character())
+ExpMatrix <- left_join(x = ExpMatrix, y = Photoperiod, by = character())
+ExpMatrix <- left_join(x = ExpMatrix, y = Colour, by = character())
+ExpMatrix <-  left_join(x = ExpMatrix, y = PhotoPattern, by = character())
+
+#generate derived variables based upon values of assembled variables.
+#3600 is s h-1; bad practice to embed a constant within an equation
+ExpMatrix <- ExpMatrix %>%
+  mutate(CumulativePhotons_umold1 = case_when(PhotoPattern == "Sine" ~ Photoperiod_h * 3600 * PAR_ue/2,
+                                              PhotoPattern == "Square" ~ Photoperiod_h * 3600 * PAR_ue))
+
+#rule based generation of new variable based upon values of other variables
+#rules will depend upon environment(s) under consideration
+ExpMatrix <- ExpMatrix %>%
+  mutate(Ecophysiological = case_when(Colour == "WW" & PAR_ue >= 90 ~ 1, #white light is never low because of spectral attenuation
+                                      Colour == "WW" & PAR_ue < 90 ~ 0, #white light is never low because of spectral attenuation
+                                      Colour == "Red" ~ 0, #red is ~ never ecophysiological in ocean water
+                                      Colour %in% c("Blue", "Green") ~ 1) #blue and green light can be natural depending upon depth and attenuation
+         )
+```
+
+```{r export to .csv}
+write_csv(x = ExpMatrix, file = file.path("ExpMatrix.csv"))
+```
+
