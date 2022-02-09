@@ -272,7 +272,7 @@ growth_amp(y = bob)
 
 
 
-```{r nestedregressions }
+```{r nested regressions }
 
 ProcessDataNestGrowth  <- ProcessData %>%
   filter(lognormdeltaOD > 0) %>%
@@ -308,11 +308,21 @@ nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, 
                                    control = list(maxiter = 500)), otherwise = NULL)),
          lognormdeltaOD_Gompertz_tidied =  map(lognormdeltaOD_Gompertz, possibly(tidy, otherwise = NULL)),
          lognormdeltaOD_Gompertz_param = map(lognormdeltaOD_Gompertz,possibly(glance, otherwise = NULL))
-        )
+        ) %>%
+    mutate(GrowthAmpdeltaOD = map(tubedata, ~growth_amp(y = .$rollmeandeltaOD)),
+           GrowthAmpOD720 = map(tubedata, ~growth_amp(y = .$rollmeanOD720))
+    )
+```
 
- # testgomp <- ProcessData %>%
- # 
- #  nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, ActinicMid_parOD720, ActinicMid_dayOD720,rollmeanOD720,rollmeandeltaOD,lognormOD720, lognormdeltaOD, LagSeedOD720, LagSeeddeltaOD)) %>%
+
+```{r test fits}
+testamp <- ProcessData %>%
+  filter(lognormdeltaOD > 0) %>%
+  filter(lognormOD720 > 0) %>%
+nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, ActinicMid_parOD720, ActinicMid_dayOD720,rollmeanOD720,rollmeandeltaOD,lognormOD720, lognormdeltaOD, LagSeedOD720, LagSeeddeltaOD)) %>%
+  mutate(GrowthAmpdeltaOD = map(tubedata, ~growth_amp(y = .$rollmeandeltaOD)))
+  
+
 ```
 
 
