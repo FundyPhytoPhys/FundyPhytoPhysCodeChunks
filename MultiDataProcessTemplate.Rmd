@@ -316,17 +316,16 @@ nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, 
 
 
 ```{r test fits}
-testamp <- ProcessData %>%
-  filter(lognormdeltaOD > 0) %>%
-  filter(lognormOD720 > 0) %>%
-nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, ActinicMid_parOD720, ActinicMid_dayOD720,rollmeanOD720,rollmeandeltaOD,lognormOD720, lognormdeltaOD, LagSeedOD720, LagSeeddeltaOD)) %>%
-  mutate(GrowthAmpdeltaOD = map(tubedata, ~growth_amp(y = .$rollmeandeltaOD)))
-  
+#Chunk to work out additions of new fit models
+
+# testamp <- ProcessData %>%
+#   filter(lognormdeltaOD > 0) %>%
+#   filter(lognormOD720 > 0) %>%
+# nest(tubedata = c(time, abs_time, ToD, Day, Actinic_par, OD680, OD720, deltaOD, ActinicMid_parOD720, ActinicMid_dayOD720,rollmeanOD720,rollmeandeltaOD,lognormOD720, lognormdeltaOD, LagSeedOD720, LagSeeddeltaOD)) %>%
+#   mutate(GrowthAmpdeltaOD = map(tubedata, ~growth_amp(y = .$rollmeandeltaOD)))
+#   
 
 ```
-
-
- 
 
 
 ```{r plot logistics predictions}
@@ -570,6 +569,7 @@ ProcessDataNestGrowth %>%
 
 
 # Save .Rds of ProcessDataNestGrowth containing logistic fits of growth data from time resolved and whole interval fits
+This .Rds is the substrate for the 'MultiCultiCompare.Rmd to compare information across multiple runs.
 
 ```{r}
 # saveRDS(object = ProcessDataNestGrowth, file = file.path(DataOut, paste(ProcessFileName,  "ProcessDataNestGrowth.Rds",  sep = "_")), ascii = FALSE, version = NULL, compress = TRUE, refhook = NULL)
