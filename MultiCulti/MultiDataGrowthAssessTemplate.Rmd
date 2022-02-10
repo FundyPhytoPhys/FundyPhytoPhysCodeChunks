@@ -1,0 +1,342 @@
+---
+title: "MultiDataGrowthAssess"
+author:
+- Laurel Genge
+- Carlie Barnhill
+- Max Berthold
+- Douglas A. Campbell
+- Mireille Savoie
+date: "`r format(Sys.Date())`"
+output:
+bookdown::html_document2:
+    code_folding: show
+    keep_md: yes
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 6
+    fig_caption: yes
+bibliography: Prochlorococcus_O2_NPQ.bib
+csl: plos-one.csl
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Set figure caption font size
+```{css, echo=FALSE}
+p.caption {
+  font-size: 18px;
+}
+```
+
+## Set Chunk Options
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+knitr::opts_chunk$set(fig.path='Figs/')
+```
+
+
+# Introduction
+
+# Materials and Methods
+
+## Load Libraries and set project variables
+
+```{r load libraries}
+# libraries; Note check actual dependencies
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(broom)
+library(knitr)
+library(zoo)
+#library(tidyquant)
+#library(data.table)
+#library(googledrive)
+#library(googlesheets4)
+#library(dplyr)
+```
+
+```{r set project variables}
+#"..", takes up a level in the directory path
+Project <- "PICO"
+DataIn <- file.path("..","ProcessedData", "LogGrowthFits")
+PlotsPath <- file.path("..","Plots")
+ShinyPath <- file.path("..", "ShinyPico", "data")
+DataOut <- file.path("..","GrowthAssessData")
+MetaCatalog <- file.path("..","PicoCatalog.csv")
+
+
+
+#set the hour of day at which photoperiod starts for later generation of ToD Time of Day
+#StartHour <- 6
+
+```
+
+```{r set colours}
+MyWavelengths = c(405, 450, 475, 530, 615, 660, 730, "WW")
+MCMIXColours = c("violet", "darkblue", "dodgerblue", "green","orange","red","purple", "black")
+
+names(MCMIXColours) <- MyWavelengths
+MCMIXColours
+```
+
+## List previously processed data
+
+Note: Split files will not be correct for Par_ue, but Actinic_par should be OK Fix: replace MetaData Par_ue with max(Actinic_par) for each file or split file
+
+```{r previous ProcessedData}
+ProcessedFiles <- list.files(path = DataIn, pattern = Project, full.names = TRUE)
+
+ProcessedFiles
+```
+
+# Read .Rds, Summarize, Combine to single data frame
+
+## Create function using to read in .Rds, adding source filename as a column
+
+```{r readRDS_plus}
+readRDS_plus <- function(Flnm){readRDS(file = Flnm) %>%
+    mutate(Filename = Flnm)
+}
+```
+
+## Read in ProcessedFiles .Rds
+```{r read selected ProcessedData}
+
+# TestData <- readRDS_plus(Flnm = file.path("../ProcessedData/LogGrowthFits/20200731_PICO_MCMIX004_RUN17_ProcessDataNestGrowth.Rds"))
+ 
+#include "OD720_logistic","deltaOD_logistic" if we need to regenerate predictions for plotting?                                        
+LogFitsData <-  ProcessedFiles %>%
+    map_df(~readRDS_plus(Flnm = .)) %>%
+    select(-c("PrimaryOperator", "Motivation", "doi", "SourceSalinity", "EndDate", "Salinity",  "InocpH", "data", "OD720_logistic","deltaOD_logistic"))
+
+```
+
+
+# Plot growth rates for each combination of Tube x Filename
+
+```{r plot growth, flag growth}
+OD720_unnest <- LogFitsData %>%
+unnest(cols = c(OD720_logistic_tidied), names_sep = "_", keep_empty = TRUE) %>%
+  pivot_wider(names_from =  OD720_logistic_tidied_term, values_from = c(OD720_logistic_tidied_estimate, OD720_logistic_tidied_std.error, OD720_logistic_tidied_statistic, OD720_logistic_tidied_p.value), names_sep = "_")  %>%
+  rename(OD720_pmax = OD720_logistic_tidied_estimate_pmax,
+         OD720_pmax_se = OD720_logistic_tidied_std.error_pmax,
+         OD720_mu = OD720_logistic_tidied_estimate_mu,
+         OD720_mu_se = OD720_logistic_tidied_std.error_mu,
+         OD720_intercept = OD720_logistic_tidied_estimate_intercept,
+         OD720_intercept_se = OD720_logistic_tidied_std.error_intercept) %>%
+   mutate(GrowthFlag_OD720 = if_else(!is.na(OD720_pmax) & (OD720_intercept + OD720_intercept_se)  < (OD720_mu - OD720_mu_se)*7, 1, 0))
+
+OD720SummaryGrowthPlot <- OD720_unnest %>%
+  # filter(OD720_mu_se < 0.05) %>%
+  #  filter(OD720_mu < 0.05) %>%
+  filter(OD720_mu_se < 2 * OD720_mu) %>%
+  ggplot() +
+  geom_point(aes(x = Par_ue, y = OD720_mu, colour = as.factor(WL))) +
+   labs(subtitle = "Strain, O2, Actinic PAR (nm)", y = "Cell Density and Cell Size Specific Exponential Growth Rate (OD720_mu)", x = "Growth Light (µE = µmol photons m-2 s-1)") +
+  #geom_text(aes(x = Par_ue, y = OD720_mu, label= Run),hjust=0, vjust=0) +
+  geom_errorbar(aes(x = Par_ue, ymin = OD720_mu - OD720_mu_se, ymax = OD720_mu + OD720_mu_se, colour = as.factor(WL))) +
+  scale_x_continuous(breaks=seq(0, 200, by = 50)) +
+  coord_cartesian(xlim = c (0, 200)) +
+  scale_colour_manual(values = MCMIXColours) +
+  facet_grid (cols = vars(O2, WL), rows = vars(Strain)) +
+  theme_bw() +
+  labs(colour = "Actinic PAR (nm)")
+
+OD720SummaryGrowthPlot
+
+ODDelta_unnest <- LogFitsData %>%
+unnest(cols = c(deltaOD_logistic_tidied), names_sep = "_", keep_empty = TRUE) %>%
+  pivot_wider(names_from =  deltaOD_logistic_tidied_term, values_from = c(deltaOD_logistic_tidied_estimate, deltaOD_logistic_tidied_std.error, deltaOD_logistic_tidied_statistic, deltaOD_logistic_tidied_p.value), names_sep = "_")  %>%
+  rename(deltaOD_pmax = deltaOD_logistic_tidied_estimate_pmax,
+         deltaOD_pmax_se = deltaOD_logistic_tidied_std.error_pmax,
+         deltaOD_mu = deltaOD_logistic_tidied_estimate_mu,
+         deltaOD_mu_se = deltaOD_logistic_tidied_std.error_mu,
+         deltaOD_intercept = deltaOD_logistic_tidied_estimate_intercept,
+         deltaOD_intercept_se = deltaOD_logistic_tidied_std.error_intercept)%>%
+   mutate(GrowthFlag_deltaOD = if_else(!is.na(deltaOD_pmax) & (deltaOD_intercept + deltaOD_intercept_se)  < (deltaOD_mu - deltaOD_mu_se)*7, 1, 0)) #Growth flag using deltaOD_pmax instead of _mu usually returned erroneous flag of 0.  
+
+
+deltaODSummaryGrowthPlot <- ODDelta_unnest %>%
+  filter(deltaOD_mu_se < 2 * deltaOD_mu) %>%
+  #filter(deltaOD_mu_se < 0.05) %>%
+  #filter(deltaOD_mu < 0.05) %>%
+  ggplot() +
+  geom_point(aes(x = Par_ue, y = deltaOD_mu, colour = as.factor(WL))) +
+  labs(subtitle = "Strain, O2, Actinic PAR (nm)", y = "Chlorophyll Specific Exponential Growth Rate (deltaOD_mu)", x = "Growth Light (µE = µmol photons m-2 s-1)") +
+  #geom_text(aes(x = Par_ue, y = deltaOD_mu, label= Run),hjust=0, vjust=0) +
+  geom_errorbar(aes(x = Par_ue, ymin = deltaOD_mu - deltaOD_mu_se, ymax = deltaOD_mu + deltaOD_mu_se, colour = as.factor(WL))) + 
+  coord_cartesian(xlim = c (0, 200)) + 
+  scale_x_continuous(breaks=seq(0, 200, by = 50)) +
+  scale_colour_manual(values = MCMIXColours) +
+  facet_grid (cols = vars(O2, WL), rows = vars(Strain)) +
+  theme_bw() +
+  labs(colour = "Actinic PAR (nm)")
+
+deltaODSummaryGrowthPlot
+
+
+```
+
+```{r plot growth flags}
+
+OD720GrowthFlagPlot <- OD720_unnest %>%
+  #filter(deltaOD_mu_se < 2 * deltaOD_mu) %>%
+  #filter(deltaOD_mu_se < 0.05) %>%
+  #filter(deltaOD_mu < 0.05) %>%
+  ggplot() +
+  geom_point(aes(x = Par_ue, y = GrowthFlag_OD720, colour = as.factor(WL), labels = c(Run))) +
+  labs(subtitle = "Strain, O2, Actinic PAR (nm)", y = "OD720 Growth Flag (1,0)", x = "Growth Light (µE = µmol photons m-2 s-1)") +
+  #geom_text(aes(x = Par_ue, y = deltaOD_mu, label= Run),hjust=0, vjust=0) +
+  #geom_errorbar(aes(x = Par_ue, ymin = deltaOD_mu - deltaOD_mu_se, ymax = deltaOD_mu + deltaOD_mu_se, colour = as.factor(WL))) + 
+  coord_cartesian(xlim = c (0, 200)) + 
+  scale_x_continuous(breaks=seq(0, 200, by = 50)) +
+  coord_cartesian(ylim = c (-0.5, 2)) +
+  scale_y_continuous(breaks=seq(0, 2, by = 1)) + 
+  scale_colour_manual(values = MCMIXColours) +
+  facet_grid (cols = vars(O2, WL), rows = vars(Strain)) +
+  theme_bw() +
+  labs(colour = "Actinic PAR (nm)")
+
+OD720GrowthFlagPlot
+
+plotly::ggplotly(OD720GrowthFlagPlot)
+
+deltaODGrowthFlagPlot <- ODDelta_unnest %>%
+  #filter(deltaOD_mu_se < 2 * deltaOD_mu) %>%
+  #filter(deltaOD_mu_se < 0.05) %>%
+  #filter(deltaOD_mu < 0.05) %>%
+  ggplot() +
+  geom_point(aes(x = Par_ue, y = GrowthFlag_deltaOD, colour = as.factor(WL), labels = c(Run))) +
+  labs(subtitle = "Strain, O2, Actinic PAR (nm)", y = "DeltaOD Growth Flag (1,0)", x = "Growth Light (µE = µmol photons m-2 s-1)") +
+  #geom_text(aes(x = Par_ue, y = deltaOD_mu, label= Run),hjust=0, vjust=0) +
+  #geom_errorbar(aes(x = Par_ue, ymin = deltaOD_mu - deltaOD_mu_se, ymax = deltaOD_mu + deltaOD_mu_se, colour = as.factor(WL))) + 
+  coord_cartesian(xlim = c (0, 200)) + 
+  scale_x_continuous(breaks=seq(0, 200, by = 50)) +
+  coord_cartesian(ylim = c (-0.5, 2)) +
+  scale_y_continuous(breaks=seq(0, 2, by = 1)) + 
+  scale_colour_manual(values = MCMIXColours) +
+  facet_grid (cols = vars(O2, WL), rows = vars(Strain)) +
+  theme_bw() +
+  labs(colour = "Actinic PAR (nm)")
+
+deltaODGrowthFlagPlot
+
+plotly::ggplotly(deltaODGrowthFlagPlot)
+
+
+```
+
+
+```{r unnest truncated growth data}
+OD720trunc_unnest <- LogFitsData %>%
+ unnest(cols = c(OD720trunc_logistic_tidied),names_sep = "_", keep_empty = TRUE) %>%
+  pivot_wider(names_from =  OD720trunc_logistic_tidied_term, values_from = c(OD720trunc_logistic_tidied_estimate, OD720trunc_logistic_tidied_std.error, OD720trunc_logistic_tidied_statistic, OD720trunc_logistic_tidied_p.value), names_sep = "_") %>%
+  rename(OD720trunc_pmax = OD720trunc_logistic_tidied_estimate_pmax,
+         OD720trunc_pmax_se = OD720trunc_logistic_tidied_std.error_pmax,
+         OD720trunc_mu = OD720trunc_logistic_tidied_estimate_mu,
+         OD720trunc_mu_se = OD720trunc_logistic_tidied_std.error_mu,
+         OD720trunc_intercept = OD720trunc_logistic_tidied_estimate_intercept,
+         OD720trunc_intercept_se = OD720trunc_logistic_tidied_std.error_intercept)
+
+# uncomment after I fix the exp_eqn function
+# Unnested_OD720trunc_exp <- LogFitsData %>%
+#  unnest(cols = c(OD720trunc_exp_tidied),names_sep = "_", keep_empty = TRUE) %>%
+#   pivot_wider(names_from =  OD720trunc_exp_tidied_term, values_from = c(OD720trunc_exp_tidied_estimate, OD720trunc_exp_tidied_std.error, OD720trunc_exp_tidied_statistic, OD720trunc_exp_tidied_p.value),
+#   names_sep = "_") %>%
+#   rename(OD720trunc_exp_mu = OD720trunc_exp_tidied_estimate_mu,
+#          OD720trunc_exp_mu_se = OD720trunc_exp_tidied_std.error_mu,
+#          OD720trunc_exp_intercept = OD720trunc_exp_tidied_estimate_intercept,
+#          OD720trunc_exp_intercept_se = OD720trunc_exp_tidied_std.error_intercept)
+
+```
+
+
+
+```{r save summary growth plots}
+
+ggsave(file = file.path(PlotsPath, paste("OD720SummaryGrowthPlot",".png",sep = "")), plot = OD720SummaryGrowthPlot, device = NULL, scale = 1, height=15, width= 25, units = c("cm"),dpi = 300, limitsize = TRUE)
+
+ggsave(file = file.path(PlotsPath, paste("deltaODSummaryGrowthPlot",".png",sep = "")), plot = deltaODSummaryGrowthPlot, device = NULL, scale = 1, height=15, width= 25, units = c("cm"),dpi = 300, limitsize = TRUE)
+
+
+```
+
+
+# Mirielle to join unnested truncated  growth rates here
+```{r compare lndelta to lnOD720 growth rates}
+OD720_unnest_test <- OD720_unnest %>%
+  select(-c("OD720_logistic_param", "deltaOD_logistic_tidied", "deltaOD_logistic_param"  ))
+         
+ODDelta_unnest_test <- ODDelta_unnest %>%
+  select(-c("OD720_logistic_tidied", "OD720_logistic_param", "deltaOD_logistic_param", "OD720trunc_logistic_tidied", "OD720trunc_logistic_param")) 
+
+# OD720trunc_unnest_test <- OD720trunc_unnest %>%
+#   select(-c("OD720trunc_logistic_param", "deltaOD_logistic_tidied", "deltaOD_logistic_param"  ))
+  
+EvenGrowthLog <- left_join(x = OD720_unnest_test, y = ODDelta_unnest_test)
+
+
+
+EvenGrowthLogPlot <- EvenGrowthLog %>% 
+  #filter(deltaOD_mu_se < 2 * deltaOD_mu) %>%
+  #filter(OD720_logistic_tidied_p.value_mu < 0.05) %>%
+  #filter(deltaOD_logistic_tidied_p.value_mu < 0.05) %>%
+  ggplot(aes(x = OD720_mu, y = deltaOD_mu, colour = WL)) +
+  theme(panel.spacing.x = unit(10, "cm"), panel.spacing.y = unit(2, "cm")) +
+  geom_point(aes(labels = c(Run))) +
+#geom_errorbar(aes(xmin =  lndeltaODgrowth_tidied_estimate -  lndeltaODgrowth_tidied_std.error, xmax = lndeltaODgrowth_tidied_estimate +  lndeltaODgrowth_tidied_std.error)) +
+  scale_colour_manual(values = MCMIXColours) +
+  #geom_text(aes(x = OD720_mu, y = deltaOD_mu, label= Run),hjust=0, vjust=0) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  coord_fixed(ratio = 1) +
+  coord_cartesian(xlim = c (0, 0.03), ylim = c(0, 0.03)) +
+  scale_x_continuous(breaks=seq(0, 0.03, by = 0.01)) +
+  labs(subtitle = "Strain, O2, Actinic PAR (nm)", y = "Chlorophyll Specific Exponential Growth Rate (deltaOD_mu)", x = "Cell Density and Cell Size Specific Exponential Growth Rate (OD720_mu)") +
+  facet_grid(rows = vars(Strain), cols = vars(O2, WL)) + 
+  theme_bw() + 
+  labs(colour = "Actinic PAR (nm)")
+
+EvenGrowthLogPlot
+
+plotly::ggplotly(EvenGrowthLogPlot)
+
+
+```
+
+
+```{r save Even Growth Plots}
+ggsave(file = file.path(PlotsPath, paste("EvenGrowthLogPlot",".png",sep = "")), plot = EvenGrowthLogPlot, device = NULL, scale = 1, height=15, width= 25, units = c("cm"),dpi = 300, limitsize = TRUE)
+
+```
+
+
+
+```{r save unested growth summaries to ShinyPico}}
+
+# saveRDS(object = EvenGrowthLog, file = file.path(ShinyPath, "PicoGrowthLogs.Rds"), ascii = FALSE, version = NULL, compress = FALSE, refhook = NULL)
+
+# also save RDS file to shiny folder
+
+saveRDS(EvenGrowthLog, file = file.path("ShinyPico", "data", paste(Project, "GrowthLogs", ".Rds",sep = "_"),fsep = .Platform$file.sep))
+
+
+```
+
+
+Combine separate growth estimates from mean and s.d. <https://www.statstodo.com/CombineMeansSDs_Pgm.php>
+
+```{r combine estimates by condition}
+# SelectedDataGrowthRates %>%
+#   group_by(Par_ue, Strain, O2, WL) %>%
+```
+
+XXXXX
+
+
+# Statistical ANOVA to determine effects of WL, O2, Par_ue & Strain on metric of growth rate.
+
+Normally not more than 3 factor ANOVA, so consider running separately for each strain.
