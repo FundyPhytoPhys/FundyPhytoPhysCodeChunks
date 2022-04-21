@@ -1,0 +1,19 @@
+---
+title: "ScientificTen"
+output: html_document
+---
+
+```{r}
+ScientificTen <- function(x, sf = 2){
+  y <- format(signif(x, sf), scientific = TRUE) %>% as.character()
+  z <- str_split(y, pattern = "e")[[1]] %>% as.numeric()
+  a <- if_else(z[2] > -10 | z[2] < 10, last(z[2]), z[2])
+  if(z[2]<0){
+    return(glue(z[1],"×10","^",str_replace_all(a, "[[+]]", ""),"^"))
+  }
+  else{
+    return(glue(z[1],"×10","^",a,"^"))
+  }
+}
+```
+

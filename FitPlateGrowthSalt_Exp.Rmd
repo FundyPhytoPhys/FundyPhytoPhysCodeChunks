@@ -1,0 +1,430 @@
+---
+title: "Plot and Analyze microbial plate growth data"
+author: "Douglas A. Campbell, Matt Tanton, Maximilian Berthold, Melissa L. Rioux"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    df_print: paged
+---
+ToDo
+Add filtering variable values to .Rmd output
+
+Set variables for project
+```{r project data}
+Project <- "salinity_growth"
+FileIDSingle <- "Chl"
+Replic <- "AllSal"
+DataFolder <- "ProcessData"
+
+#grouping variables for rows & columns, and for nesting for fitting
+RowVar <- "salinity" #expected salinity
+RowVar2 <- "CalcSal"
+ColVar <- "strain"
+NestVar <- "par_ue"
+NestVarII <- "id"
+
+#filtering variables
+ChlAb = c("680", "720", "750")
+Wavelength_nm <- c("680min720", "680min750", "680", "720", "750")
+Par_ue = 300
+nm_filter <- c("680min750")
+#Strains <- c("CZS25K", "CZS48M", "PCC6803", "CCMP1333", "CCMP836", "NIES981")
+Strains <- c( "CCMP1333")
+StartDate <- c("20200828", "20201002", "20201005")
+TissueTreated = FALSE
+Media = "BG11+Na2CO3"
+SourceSal = "4"
+StopTime = 10
+
+#fitting variable
+FitVar <- "RegresChl_ugL"
+#CorrOD RegresCellCount_mL RegresChl_ugL
+
+```
+
+
+```{r load libraries}
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(broom)
+library(knitr)
+library(minpack.lm)
+library(nlstools)
+library(nlsMicrobio)
+#library(OneR)
+#source("CampbelLabRFunctions.txt")
+```
+
+
+```{r read data, warning=FALSE}
+ImportGrowth <- readRDS(file = file.path(DataFolder,paste(Project,FileIDSingle, "GrowthLong.Rds", sep  = "_"),fsep = .Platform$file.sep))
+
+#https://stackoverflow.com/questions/64111558/passing-variables-into-the-names-glue-parameter-of-tidyrpivot-wider
+
+GrowthLong <- ImportGrowth %>%
+  filter(Wavelength %in% nm_filter) #%>%
+  # pivot_wider(id_cols = -c(OD, AvBlankOD), names_from = Wavelength, values_from = CorrOD, names_glue = "nm_{Wavelength}") %>% 
+  # mutate("680min720" = nm_680 - nm_720, "680min750" = nm_680 - nm_750) %>%
+  # pivot_longer(cols = c(nm_680, nm_720, nm_750, "680min720", "680min750"), values_to = "CorrOD", names_to = "Wavelength") %>%
+  # mutate(Wavelength = str_remove(Wavelength, "nm_")) %>%
+  # mutate(CorrOD = if_else(CorrOD < 0.001, 0.001, CorrOD)) #experimentally test to set values below 0.001 to 0.001 (~detection limit device)
+
+
+GrowthLong <- GrowthLong %>%
+  group_by(!!sym(NestVar), !!sym(RowVar2), !!sym(ColVar), !!sym(NestVarII), exp_date) %>%
+  mutate(logFitVarminFitVar = log(!!sym(FitVar)/min(!!sym(FitVar), na.rm = TRUE))) %>% #problem with log leads to NaN, when value is very small
+  ungroup() %>%
+  mutate(strain = as.factor(strain))
+
+
+```
+
+
+```{r preplot}
+GrowthLong %>%
+  filter(strain %in% Strains) %>%
+  filter(exp_date %in% StartDate) %>%
+  #filter(exp_date == "20200902") %>%
+  filter(Wavelength %in% Wavelength_nm) %>%
+  #filter(tissue_treated_plate == TissueTreated) %>%
+  #filter(media == Media) %>%
+  #filter(SourceSal == source_salinity) %>%
+  ggplot()+
+  geom_point(aes(x = E_days, y = !!sym(FitVar), colour = as.factor(Wavelength))) +
+  #coord_cartesian(ylim = c(0, 2)) +
+  facet_grid(cols = vars(CalcSal), rows = vars(!!sym(NestVar))) +
+    theme_bw() +
+  labs(caption = paste(Wavelength_nm, "nm; PAR", Par_ue, "uE"))
+
+```
+
+```{r noise filtering}
+#set filtering variables at top
+#pick filtering option as either a simple threshold or a factor change between OD and OD_lead
+
+#Screen_OD <- 2
+
+FitData <- as_tibble(GrowthLong) %>%
+  filter(strain %in% Strains) %>%
+  filter(exp_date %in% StartDate) %>% #if multiple dates are applied, use %in% instead of ==
+  filter(Wavelength %in% Wavelength_nm) %>%
+  #filter(tissue_treated_plate == TissueTreated) %>%
+  #filter(media == Media) %>%
+  #filter(source_salinity == SourceSal) %>%
+  group_by(well) %>%
+  arrange(well, E_days) %>%
+  mutate(FitVar_lead = lead(!!sym(FitVar), na.rm = TRUE)) %>%
+  #filter(CorrOD < (OD_lead / Screen_OD)) %>%
+  #filter(CorrOD < Screen_OD) %>%
+  filter(E_days < StopTime)
+
+test <- FitData %>%
+  group_by(!!sym(NestVar), !!sym(RowVar), exp_date) %>%
+  mutate(LagSeed = E_days[which.min(!!sym(FitVar))])
+  
+```
+
+
+```{r filter plot}
+FitData %>%
+  filter(strain %in% Strains) %>%
+  filter(exp_date %in% StartDate) %>%
+  filter(Wavelength %in% Wavelength_nm) %>%
+  #filter(tissue_treated_plate == TissueTreated) %>%
+  filter(media == Media) %>%
+  ggplot()+
+  geom_point(aes(x = E_days, y = !!sym(FitVar), colour = as.factor(salinity))) +
+  #coord_cartesian(ylim = c(0, 2)) +
+  facet_grid(cols = vars(exp_date), rows = vars(!!sym(NestVar))) +
+    theme_bw() +
+  labs(caption = paste(Wavelength_nm, "nm; PAR", Par_ue, "uE"))
+```
+
+
+Define equations as functions.
+x will be taken from 'E_days' when we run the fit.
+```{r logistic_eqn}
+LogisticEqn <- function(x, pmax, mu, intercept){(pmax*intercept*exp(mu*x))/(pmax + (intercept*(exp(mu*x)-1)))
+}
+
+# #not working properly
+# loglag_eqn <- function(x, pmax, mu, intercept, lag){(pmax*intercept*exp(mu*(x-lag)))/(pmax + (intercept*(exp(mu*(x-lag))-1)))
+# }
+#natural log(RFU/min(RFU)); works, but confusing
+ModGompertzEqn <- function(Amax,Amu,lag,x){(Amax*(exp(-exp((Amu*exp(1))/Amax*(lag-x)+1))))}
+```
+
+
+
+<!-- ```{r log fits} -->
+
+<!-- MuStart = (log(max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE)) - log(min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE)))/max(FitData$E_days) -->
+
+<!-- LogisticEqnStart<-list(pmax = max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE), mu = MuStart, intercept = min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE)) -->
+
+<!-- LogisticEqnLower<-c((max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 0.5),MuStart/10,((min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 0.5))) -->
+
+<!-- LogisticEqnUpper<-c((max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 2),MuStart*2,((min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 2))) -->
+
+<!-- # loglag_eqn_start<-list(pmax = max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE), mu = 0.01, intercept = min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE), lag =0) -->
+<!-- #  -->
+<!-- # loglag_eqn_lower<-c((max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 0.2),0.001,((min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 0.8)),0) -->
+<!-- #  -->
+<!-- # loglag_eqn_upper<-c((max(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 2),0.1,((min(FitData[FitData$Wavelength == Wavelength_nm, FitVar], na.rm = TRUE) * 1.2)),24) -->
+
+<!-- ModGompertzEqnStart<-list(Amax = max(FitData[FitData$Wavelength == Wavelength_nm, "logFitVarminFitVar"], na.rm = TRUE), Amu = MuStart, lag = 24) -->
+
+<!-- ModGompertzEqnLower<-c((max(FitData[FitData$Wavelength == Wavelength_nm, "logFitVarminFitVar"], na.rm = TRUE) * 0.5),MuStart/10, 0) -->
+
+<!-- ModGompertzEqnUpper<-c((max(FitData[FitData$Wavelength == Wavelength_nm, "logFitVarminFitVar"], na.rm = TRUE) * 2),MuStart*2,180) -->
+<!-- ``` -->
+
+<!-- Fit treatment specific logistic growth trajectories using nest purrr:map & broom::augment -->
+<!-- ```{r treat growth} -->
+<!-- TreatNest <- FitData %>% -->
+<!--   nest(data = -c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength)) -->
+
+<!-- TreatLog <- TreatNest %>%  -->
+<!--   mutate( -->
+<!--   Fitlog = map(data, ~nlsLM(!!sym(FitVar) ~ LogisticEqn(x = E_days, pmax, mu, intercept), data = .x, start = LogisticEqnStart, lower = LogisticEqnLower, upper = LogisticEqnUpper)), -->
+<!--   Predictlog = map(Fitlog ,augment), -->
+<!--   Tidiedlog = map(Fitlog , tidy), -->
+<!--   Paramlog = map(Fitlog , glance) -->
+<!--   ) %>% -->
+<!--    mutate( -->
+<!--     FitGompertz = (map(data, ~nlsLM(logFitVarminFitVar ~ModGompertzEqn(x = E_days, Amax, Amu, lag), data = .x, start = ModGompertzEqnStart, lower = ModGompertzEqnLower, upper = ModGompertzEqnUpper))), -->
+<!--     Predictgompertz = map(FitGompertz, augment), -->
+<!--     Tidiedgompertz = map(FitGompertz, tidy), -->
+<!--     Paramgompertz = map (FitGompertz, glance)) -->
+
+<!-- TreatLogPredict <- TreatLog %>% -->
+<!--   unnest(Predictlog) -->
+
+<!-- TreatLogParam <- TreatLog %>%  -->
+<!--   unnest(Tidiedlog) %>% -->
+<!--   select(c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength, term:p.value)) -->
+
+<!-- TreatGompertzPredict <- TreatLog %>% -->
+<!--   unnest(Predictgompertz) -->
+
+<!-- TreatGompertzParam <- TreatLog %>%  -->
+<!--   unnest(Tidiedgompertz) %>% -->
+<!--   select(c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength, term:p.value)) -->
+<!-- ``` -->
+
+<!-- Plot logistic & Modified Gompertz with Lag fits -->
+<!-- ```{r TreatLogPlot gompertzplot} -->
+<!-- TreatLogPlot <- TreatLogPredict %>%  -->
+<!--   ggplot() +   -->
+<!--   geom_line(aes(x = E_days, y = .fitted), size = 0.5) + -->
+<!--   geom_point(aes(x = E_days, y = CorrOD), size = 0.6) + -->
+<!--   # geom_ribbon(aes(x = E_days, ymin = (.fitted - .resid), ymax = (.fitted + .resid), alpha = 0.1),show.legend = FALSE) + -->
+<!--   facet_grid(cols = vars(CalcSal), rows = vars(par_ue)) + -->
+<!--   theme_bw() + -->
+<!--   #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_text(colour = "black")) + -->
+<!--   # labs(y = expression(paste("OD"[`680 nm`])), x = "Elapsed time (h)", title = "Treatment Growth, Logistic Fits", subtitle = paste(str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_"))) -->
+<!--   labs(y = "OD", -->
+<!--        title = "Treatment Growth, Logistic Fits", -->
+<!--        subtitle = paste(Wavelength_nm, "nm", str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")), -->
+<!--        caption = "Logistic line") -->
+
+<!-- TreatLogPlot -->
+
+<!-- TreatGompertzLagPlot <- TreatGompertzPredict %>%  -->
+<!--   ggplot() +   -->
+<!--   geom_line(aes(x = E_days, y = .fitted), size = 0.5) + -->
+<!--   geom_point(aes(x = E_days, y = logFitVarminFitVar), size = 0.6) + -->
+<!--   # geom_ribbon(aes(x = E_days, ymin = (.fitted - .resid), ymax = (.fitted + .resid), alpha = 0.1),show.legend = FALSE) + -->
+<!--   facet_grid(cols = vars(CalcSal), rows = vars(par_ue)) + -->
+<!--   theme_bw() + -->
+<!--   #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_text(colour = "black")) + -->
+<!--   #labs(y = expression(paste("log(OD"[`680 nm`]*"/min OD"[`680 nm`]*")")), x = "Elapsed time (h)", title = "Treatment Growth, Modified Gompertz with Lag", subtitle = paste(str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_"))) -->
+<!--   labs(y = "log(OD/minOD)", -->
+<!--        title = "Treatment Growth, Modified Gompertz with Lag", -->
+<!--        subtitle = paste(Wavelength_nm, "nm", str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")), -->
+<!--        caption = "Modified Gompertz with Lag Line") -->
+
+<!-- TreatGompertzLagPlot -->
+<!-- ``` -->
+
+
+Fit treatment specific logistic growth trajectories using nest purrr:map & broom::augment using nest specific start, lower & upper settings extracted from each nest on the fly.
+This may be necessary if the 'nests' contain diverse data patterns that fail to fit with generic start, lower & upper parameters extracted from the entire dataset
+
+```{r treat growth specific}
+#run nesting by passing in values of variables set at top; 
+#!!sym(... allows nest to access the characters of the values passed in
+TreatNestSpecific <- test %>%
+  nest(data = -c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength, LagSeed, exp_date))
+
+
+
+#extract nest-specific start, lower & upper setting by passing in "."
+TreatLogSpecific <- TreatNestSpecific %>% 
+  mutate(
+  FitLog = map(data, ~nlsLM(!!sym(FitVar) ~ LogisticEqn(x = E_days, Intercept, Mu, Pmax),
+                            data = .x, 
+                            start = list(Intercept = min(.[,FitVar], na.rm = TRUE), Mu = (log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days), Pmax = max(.[,FitVar], na.rm = TRUE)), 
+                            lower = c((min(.[,FitVar], na.rm = TRUE) * 0.05), ((log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days)) *0.05, ((max(.[,FitVar], na.rm = TRUE)) * 0.05)),
+                            upper = c((min(.[,FitVar], na.rm = TRUE) * 5), ((log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days)) * 5, ((max(.[,FitVar], na.rm = TRUE)) * 5)))),
+  PredictLog = map(FitLog, augment),
+  TidiedLog = map(FitLog, tidy),
+  ParamLog = map(FitLog, glance)
+  ) %>%
+   mutate(
+    FitGompertz = (map(data, ~nlsLM(logFitVarminFitVar ~ ModGompertzEqn(x = E_days, Lag, Gmu, Gmax),
+                                    data = .x,
+                                    start = list(Lag = LagSeed, Gmu = (log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days), Gmax = max(.[, "logFitVarminFitVar"], na.rm = TRUE)),
+                                    lower = c(0, ((log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days)) * 0.01, max(.[, "logFitVarminFitVar"], na.rm = TRUE) * 0.01),
+                                    upper = c(48, ((log(max(.[, FitVar], na.rm = TRUE)) - log(min(.[ FitVar], na.rm = TRUE)))/max(.$E_days)) * 1.5, max(.[, "logFitVarminFitVar"], na.rm = TRUE) * 1.5)))),
+    PredictGompertz = map(FitGompertz, augment),
+    TidiedGompertz = map(FitGompertz, tidy),
+    ParamGompertz = map (FitGompertz, glance))
+
+TreatLogSpecificPredict <- TreatLogSpecific %>%
+  unnest(PredictLog)
+
+TreatLogSpecificCoeff <- TreatLogSpecific %>% 
+  unnest(TidiedLog) %>%
+  dplyr::select(c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength, term:p.value))
+
+TreatGompertzSpecificPredict <- TreatLogSpecific %>%
+  unnest(PredictGompertz)
+
+TreatGompertzSpecificCoeff <- TreatLogSpecific %>% 
+  unnest(TidiedGompertz) %>%
+  dplyr::select(c(!!sym(NestVar), !!sym(RowVar2), !!sym(RowVar), !!sym(ColVar), Wavelength, term:p.value))
+```
+
+
+```{r}
+CheckDate <- StartDate %>%
+  as_data_frame(StartDate) %>%
+  slice(1)
+
+TreatLogSpecificPlot <- TreatLogSpecificPredict %>% 
+  filter(exp_date %in% CheckDate) %>%
+  filter(Wavelength %in% nm_filter) %>%
+  ggplot() +  
+  geom_line(aes(x = E_days, y = .fitted), size = 0.5) +
+  geom_point(aes(x = E_days, y = !!sym(FitVar)), size = 0.6) +
+  # geom_ribbon(aes(x = E_days, ymin = (.fitted - .resid), ymax = (.fitted + .resid), alpha = 0.1),show.legend = FALSE) +
+  facet_grid(cols = vars(CalcSal), rows = vars(par_ue)) +
+  theme_bw() +
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_text(colour = "black")) +
+  #labs(y = expression(paste("log(OD"[`680 nm`]*"/min OD"[`680 nm`]*")")), x = "Elapsed time (h)", title = "Treatment Growth, Modified Gompertz with Lag", subtitle = paste(str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")))
+  labs(y = FitVar,
+       title = "Treatment Growth, Specific Log",
+       subtitle = paste(nm_filter, "nm", str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")),
+       caption = "Log")
+
+TreatLogSpecificPlot
+
+TreatGompertzLagSpecificPlot <- TreatGompertzSpecificPredict %>% 
+  filter(exp_date %in% CheckDate) %>%
+  filter(Wavelength %in% nm_filter) %>%
+  ggplot() +  
+  geom_line(aes(x = E_days, y = .fitted), size = 0.5) +
+  geom_point(aes(x = E_days, y = logFitVarminFitVar), size = 0.6) +
+  # geom_ribbon(aes(x = E_days, ymin = (.fitted - .resid), ymax = (.fitted + .resid), alpha = 0.1),show.legend = FALSE) +
+  facet_grid(cols = vars(CalcSal), rows = vars(par_ue)) +
+  theme_bw() +
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text = element_text(colour = "black")) +
+  #labs(y = expression(paste("log(OD"[`680 nm`]*"/min OD"[`680 nm`]*")")), x = "Elapsed time (h)", title = "Treatment Growth, Modified Gompertz with Lag", subtitle = paste(str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")))
+  labs(y = FitVar,
+       title = "Treatment Growth, Modified Gompertz Specific with Lag",
+       subtitle = paste(nm_filter, "nm", str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_")),
+       caption = "Modified Gompertz with Lag Line")
+
+TreatGompertzLagSpecificPlot
+```
+
+
+```{r save plots}
+# ggsave(filename = file.path("Plots", paste(Project, Replic, 
+# FileIDSingle, str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_"),"TreatLogPlot.png", sep = "_"),fsep = .Platform$file.sep ), plot = TreatLogPlot, height = 4, width = 6)
+# 
+# ggsave(filename = file.path("Plots", paste(Project, Replic, 
+# FileIDSingle, str_c(Strains, collapse = "_"), str_c(StartDate, collapse = "_"), "TreatGompertzLagPlot.png", sep = "_"),fsep = .Platform$file.sep ), plot = TreatGompertzLagPlot, height = 4, width = 6)
+```
+
+Display & save parameters of logistic & modified Gompertz with lag.
+```{r fit parameters}
+TreatLogSpecificCoeff %>%
+  mutate_if(is.numeric, round, digits = 3)
+
+TreatGompertzSpecificCoeff %>%
+  mutate_if(is.numeric, round, digits = 3)
+
+#save .rds of the current round of fit parameters
+saveRDS(TreatLogSpecificCoeff, file = file.path(DataFolder,paste(Project,FileIDSingle, Replic, "TreatLogSpecificCoeff", str_c(Strains, collapse = "_"), "ChlAb", ".Rds",sep = "_"),fsep = .Platform$file.sep))
+
+#, str_c(StartDate, collapse = "_") add, if not all replicates are run at once
+
+saveRDS(TreatGompertzSpecificCoeff, file = file.path(DataFolder,paste(Project,FileIDSingle, Replic, "TreatGompSpeCo", str_c(Strains, collapse = "_"), "ChlAb", ".Rds",sep = "_"),fsep = .Platform$file.sep))
+
+#append current round of logistic fit parameters to growing .csv
+#Be Careful: Running the same data multiple time will continue to append to growing .csv
+
+# write_csv(TreatLogSpecificCoeff, path =  file.path(Project, DataFolder, paste(FileIDSingle, Replic, "TreatLogSpecificCoeff.csv",sep = "_"),fsep = .Platform$file.sep), col_names = TRUE, append = TRUE)
+# 
+# write_csv(TreatGompertzSpecificCoeff, path =  file.path(Project, DataFolder, paste(FileIDSingle, Replic, "TreatGompSpeCo.csv",sep = "_"),fsep = .Platform$file.sep), col_names = TRUE, append = TRUE)
+```
+
+
+Fit and plot treatment id specific (well or tube) growth trajectories using nest purrr:map & broom::augment
+
+Not Working; issue with data?
+```{r well growth}
+# well_nest <- as_tibble(GrowthLong) %>%
+#   filter(strain %in% c("CCMP1333", "PCC8806")) %>%
+#   filter(Wavelength == Wavelength_nm) %>%
+#   nest(-c(!!sym(NestVar), !!sym(RowVar), !!sym(ColVar), !!sym(NestVarII)))
+# 
+# 
+# well_log <- well_nest %>% 
+#   mutate(
+#   fit = map(data, ~nlsLM(!!sym(FitVar) ~ logistic_eqn(x = E_days, pmax, mu, intercept), data = .x, start = LogisticEqnStart, lower = LogisticEqnLower, upper = LogisticEqnUpper)),
+#   predict = map(fit,augment),
+#   tidied = map(fit, tidy),
+#   param = map(fit, glance)
+#   )
+# 
+# well_log_predict <-  well_log %>%
+#   unnest(predict)
+#   
+# well_log_param <- well_log %>%
+#   mutate(OD = map(data, "OD", data = .x),
+#   relmax = map(OD, ~mean(order(-.x)[1:3]/mean(order(.x)[1:3])))) %>%
+#   mutate(relmax = as.numeric(relmax)) %>%
+#   unnest(tidied) %>%
+#   select(-c(data, fit, predict, param, OD))
+# 
+# WellLogPlot <- well_log_predict %>% 
+#   filter(par_ue == Par_ue) %>%
+#   ggplot() +  
+#   geom_line(aes(x = E_days, y = .fitted,colour = !!sym(NestVarII)), size = 0.5) +
+#   geom_point(aes(x = E_days, y = OD, colour = !!sym(NestVarII)), size = 0.1) +
+# geom_ribbon(aes(x = E_days, ymin = (.fitted - .resid), ymax = (.fitted + .resid), alpha = 0.1),show.legend = FALSE) +
+#   facet_grid(cols = vars(salinity), rows = vars(strain)) +
+#   theme_bw() +
+#   labs(y = "OD",
+#        title = "Well Growth, Logistic Fits",
+#        subtitle = paste(Wavelength_nm, "_nm",
+# Par_ue, "_uE"),
+#        caption = "Logistic line, residuals grey ribbon")
+# 
+# WellLogPlot
+# 
+# ggsave(filename = file.path("plots", paste(Project, 
+# FileIDSingle, "WellLogPlot.png", sep = "_"),fsep = .Platform$file.sep ), plot = WellLogPlot)
+# 
+# #parameters of colony specific logistic fits
+# well_log_param %>%
+#   mutate_if(is.numeric, round, digits = 2)
+# 
+# saveRDS(well_log_predict, file = file.path("process_data",paste(Project,FileIDSingle, "well_log_predict", Wavelength_nm, ".Rds",sep = "_"),fsep = .Platform$file.sep))
+# 
+# saveRDS(well_log_param, file = file.path("process_data",paste(Project,FileIDSingle, "well_log_param", Wavelength_nm, ".Rds",sep = "_"),fsep = .Platform$file.sep))
+```

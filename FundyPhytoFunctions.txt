@@ -5,7 +5,7 @@ library(tidyverse)
 
 print("read_plus_csv is a function of 'Flnm', the name of the file to be read, and 'Skp' the number of rows to skip at the top of the file, with a default = 0. read_plus_csv uses read_csv to read in 'Flnm' then pipes the resulting dataframe directly to mutate to add a column 'Filename' with value set equal to Flnm for each row derived from Flnm")
 
-read_plus_csv = function(Flnm, Skp = 0) {read_csv(flnm, skip = Skp) %>% mutate(Filename = flnm)
+read_plus_csv = function(Flnm, Skp = 0) {read_csv(Flnm, skip = Skp) %>% mutate(Filename = Flnm)
 }
 
 print("data_with_sources is a function of 'DataPath', the folder (directory) that contains files with a 'Patt' character string stored in 'Patt' in their name,  to be read in, and '

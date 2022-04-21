@@ -138,7 +138,7 @@ MultiFiles
 ```
 
 Read multiple parallel files contained in DataIn using purrr::map to step through file names in MultiFiles vector
-```{r read multiple filese}
+```{r read multiple files}
 MultiData <- MultiFiles %>%
   map_df(~fread_plus(Flnm = ., Skip = "key"))
 ```

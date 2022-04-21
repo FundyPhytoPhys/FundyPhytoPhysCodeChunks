@@ -61,7 +61,7 @@ plot(pressure)
 ## Slide with an imported image saved in the same folder as the .Rmd
 
 ```{r 20200403_estuary_schematic, fig.align = 'centre', out.width='70%', out.height='70%'}
-knitr::include_graphics(file.path("figure_material/20200403_estuary_schematic.png"))
+#knitr::include_graphics(file.path("figure_material/20200403_estuary_schematic.png"))
 ```
 
 
