@@ -21,7 +21,10 @@ editor_options:
   markdown: 
     wrap: 72
 ---
+<<<<<<< HEAD
 
+=======
+>>>>>>> f6eb651c5c3581b24507b9e5f8b311e97985fe61
 # Set Chunk Options {}
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
