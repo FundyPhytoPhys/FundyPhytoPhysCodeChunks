@@ -1,0 +1,163 @@
+---
+title: "Adjustable Well Plate Layouts"
+author: "Alyson MacCormack and Brian Beardsall"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup}
+library(tidyverse)
+library(RColorBrewer)
+```
+
+## Enter values
+Change values in this chunk. Run all chunks to generate a plot.
+```{r project data}
+# Name of project, to prefix files
+Project <- "NPRatios48WellExperiment"
+
+# Where to save plots
+PlotsPath = "Plots"
+
+#Assign variables based on size of microplate
+LowerY <- 1
+UpperY <- 6
+
+LowerX <- 1
+UpperX <- 8
+
+# Add a plot title. Assign NULL if no title.
+PlotTitle <-  NULL
+
+# First treatment - by column, from left to right
+# Must be length of number of columns (x axis)
+Treatment1Label = "Phosphorus umol PO4 L-1"
+TreatmentVector1 <- c(0, 0.2, 0.5, 1, 2, 3, 5, 7)
+
+# Second treatment values (if applicable) - by row, from top to bottom (A - n)
+# Must be as long as number of rows (y axis)
+# Set label and values to NULL if not applicable
+Treatment2Label <-  "Nitrogen umol NO3 L-1"
+TreatmentVector2 <- c(0, 5, 10, 30, 50, 70)
+
+# Increase to add space around the border of wells in plot
+BorderSpacing <-  0
+# Change the size of points - decrease for > 24 wells (about 9 for 96 wells)
+PointSize <-  8
+
+# Number of columns in legend. Increase to 2 if two treatments, or many levels of treatment 1.
+NumLegendColumns <-  1
+
+# Font sizes
+AxisTextSize <- 18
+LegendTextSize <- 14
+LegendTitleSize <- 16
+PlotTitleSize <- 24
+```
+
+## 96 Well Example
+96 well, 2 treatment example.
+```{r}
+# Project <- "96Well2Treatment"
+# 
+# PlotsPath = "Plots"
+# 
+# LowerY <- 1
+# UpperY <- 8
+# LowerX <- 1
+# UpperX <- 12
+# 
+# PlotTitle <-  NULL
+# 
+# Treatment1Label = "Salinity (ppt)"
+# TreatmentVector1 <- c(1, 4, 11, 18, 25, 36, 48, 65, 77,87,90,100)
+# 
+# Treatment2Label = "Light (μE)"
+# TreatmentVector2 <- c(1, 1, 1, 3, 3, 3, 10, 10)
+# 
+# BorderSpacing <-  0
+# PointSize <-  9
+# NumLegendColumns <-  2
+# 
+# AxisTextSize <- 18
+# LegendTextSize <- 18
+# LegendTitleSize <- 20
+# PlotTitleSize <- 24
+```
+
+## Internal Code
+Do not change code below if using as a template.
+```{r creation of data frame}
+# Modified from ("https://rstudio-pubs-static.s3.amazonaws.com/427185_abcc25a951c9436680dc6a8fcc471ca9.html")
+
+NumRows <- UpperY - LowerY + 1
+NumCols <- UpperX - LowerX + 1
+
+ColumnNumbers <- rep(LowerX:UpperX, NumRows)
+RowNumbers <- rep(LowerY:UpperY, each = NumCols)
+
+Treatment1Values <- rep(TreatmentVector1, NumRows)
+Treatment2Values <- rep(TreatmentVector2, each = NumCols)
+Treatment2Values
+
+PlateMap <- bind_cols("RowNumber" = RowNumbers, 
+                      "ColumnNumber" = ColumnNumbers, 
+                      "Treatment1" = Treatment1Values,
+                      "Treatment2" = Treatment2Values) %>%
+  mutate(RowLetter = LETTERS[RowNumber],
+         # reverse factor order of letters to plot correctly
+         RowLetter = factor(RowLetter, levels = rev(unique(LETTERS[RowNumbers]))),
+         WellName = paste(RowLetter, ColumnNumber, sep = ""))
+
+PlateMap
+```
+
+```{r plate diagram}
+#source("https://rstudio-pubs-static.s3.amazonaws.com/427185_abcc25a951c9436680dc6a8fcc471ca9.html")
+
+# Check if a second treatment was specified
+if("Treatment2" %in% colnames(PlateMap)) {
+  IsTreatment2 <- TRUE
+} else {
+  IsTreatment2 <- FALSE
+}
+
+PlateTreatDiagram <- PlateMap %>%
+  ggplot() +
+  # Plot colour and shape if two treatments
+  {if(IsTreatment2)geom_point(aes(x = ColumnNumber, y = RowLetter, 
+                                  colour = factor(Treatment1), 
+                                  shape = factor(Treatment2)), 
+                              size = PointSize)}+
+  # Plot just colour if one treatment
+  {if(!IsTreatment2)geom_point(aes(x = ColumnNumber, y = RowLetter, 
+                                   colour = factor(Treatment1)), 
+                               size = PointSize)} +
+  theme_bw() +
+  coord_fixed(xlim = c((LowerX - BorderSpacing), 
+                       (UpperX + BorderSpacing)), 
+              ylim = c((LowerY - BorderSpacing), UpperY + BorderSpacing)) +
+  scale_x_discrete(limits = UpperX:LowerX, 
+                   position = "top") +
+  labs(title = PlotTitle, 
+       x = NULL, y = NULL, 
+       colour = Treatment1Label, 
+       shape = Treatment2Label)+
+  theme(axis.text.x = element_text(size=AxisTextSize),
+        axis.text.y = element_text(size=AxisTextSize),
+        legend.text=element_text(size=LegendTextSize),
+        legend.title=element_text(size = LegendTitleSize),
+        plot.title = element_text(size = PlotTitleSize, hjust = 0.5),
+        legend.key = element_rect(size = .0005)
+        )+
+  theme(legend.key.width = unit(.0005, "line")) +
+  guides(colour=guide_legend(ncol=NumLegendColumns))
+PlateTreatDiagram
+```
+
+```{r save diagram}
+ggsave(filename = file.path(PlotsPath, paste(Project, "PlateTreatDiagram.png", sep = "_"),fsep = .Platform$file.sep ), plot = PlateTreatDiagram)
+```
+
