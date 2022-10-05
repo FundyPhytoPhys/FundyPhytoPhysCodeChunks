@@ -1,0 +1,27 @@
+---
+title: "Secondary Axis Title"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+To add a secondary axis title, use:
+
+```{r}
+scale_x_continuous(sec.axis = sec.axis(~ . , name = "XXX", breaks = NULL, labels = NULL))
+```
+
+To add a title to each facet, use:
+XXX, YYY and ZZZ are entered as placeholders.
+```{r}
+ggh4x::facet_nested(cols = vars(XXX, YYY), rows = vars(ZZZ), labeller = labeller(YYY = label_both, XXX = label_value, ZZZ = label_both))
+```
+
+To change the angle of a facet header, use:
+
+```{r}
+theme(strip.text.x = element_text(angle = 45))
+```
+
