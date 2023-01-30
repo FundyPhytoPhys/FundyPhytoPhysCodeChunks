@@ -16,31 +16,31 @@ library(RColorBrewer)
 Change values in this chunk. Run all chunks to generate a plot.
 ```{r project data}
 # Name of project, to prefix files
-Project <- "NPRatios48WellExperiment"
+Project <- "MicroGrowthDemo"
 
 # Where to save plots
-PlotsPath = "Plots"
+PlotsPath = "Figs"
 
 #Assign variables based on size of microplate
 LowerY <- 1
-UpperY <- 6
+UpperY <- 4
 
 LowerX <- 1
-UpperX <- 8
+UpperX <- 6
 
 # Add a plot title. Assign NULL if no title.
 PlotTitle <-  NULL
 
 # First treatment - by column, from left to right
 # Must be length of number of columns (x axis)
-Treatment1Label = "Phosphorus umol PO4 L-1"
-TreatmentVector1 <- c(0, 0.2, 0.5, 1, 2, 3, 5, 7)
+Treatment1Label = "Strain"
+TreatmentVector1 <- c(1:6)
 
 # Second treatment values (if applicable) - by row, from top to bottom (A - n)
 # Must be as long as number of rows (y axis)
 # Set label and values to NULL if not applicable
-Treatment2Label <-  "Nitrogen umol NO3 L-1"
-TreatmentVector2 <- c(0, 5, 10, 30, 50, 70)
+Treatment2Label <-  "Replicate"
+TreatmentVector2 <- c("A", "B", "C", "D")
 
 # Increase to add space around the border of wells in plot
 BorderSpacing <-  0
@@ -52,8 +52,8 @@ NumLegendColumns <-  1
 
 # Font sizes
 AxisTextSize <- 18
-LegendTextSize <- 14
-LegendTitleSize <- 16
+LegendTextSize <- 12
+LegendTitleSize <- 12
 PlotTitleSize <- 24
 ```
 
@@ -153,7 +153,9 @@ PlateTreatDiagram <- PlateMap %>%
         legend.key = element_rect(size = .0005)
         )+
   theme(legend.key.width = unit(.0005, "line")) +
-  guides(colour=guide_legend(ncol=NumLegendColumns))
+  guides(colour=guide_legend(ncol=NumLegendColumns)) +
+  theme(legend.position="none")
+
 PlateTreatDiagram
 ```
 
