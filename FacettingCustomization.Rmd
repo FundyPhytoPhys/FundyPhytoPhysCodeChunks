@@ -13,6 +13,16 @@ To add a secondary axis title, use:
 scale_x_continuous(sec.axis = sec.axis(~ . , name = "XXX", breaks = NULL, labels = NULL))
 ```
 
+One way to add an additional ribbon label with the name of a facetting variable(s), in addition to the primary facets labelled with the values of the facetting variable(s): 
+
+df %>% 
+  ggplot() +
+  geom_point(aes(x = Xvar, y = Yvar), size = 0.1) +
+  facet_grid(rows = vars(Groupvar1), cols = vars(Groupvar2)) +
+  scale_y_continuous(sec.axis = sec_axis(~ . , name = sym("Groupvar1"), breaks = NULL, labels = NULL)) +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = sym("Groupvar2"), breaks = NULL, labels = NULL))
+
+
 To add a title to each facet, use:
 XXX, YYY and ZZZ are entered as placeholders.
 ```{r}
