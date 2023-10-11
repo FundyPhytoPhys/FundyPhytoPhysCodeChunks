@@ -30,3 +30,7 @@ print("define a the Modified Gompertz equation, x will be taken from 'E_hours' w
 eqn. 14")
 gompertz_eqn <- function(x, Pmax, Mu, Intercept){pmax*((Intercept/Pmax)^exp(-Mu*x))}
 
+#Algebra to extract time to 1/2 Pmax from logistic growth fits; this might be a 'tag' to partition #data points taken from early, active growth, or late slow growth/stationary
+
+#(ln(2 - (Lintercept/(Lmax - Lintercept)))/Lmu =  t(1/2Lmax)
+
