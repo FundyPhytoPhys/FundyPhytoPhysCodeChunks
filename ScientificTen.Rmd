@@ -3,16 +3,28 @@ title: "ScientificTen"
 output: html_document
 ---
 
-```{r}
-ScientificTen <- function(x, sf = 2){
-  y <- format(signif(x, sf), scientific = TRUE) %>% as.character()
-  z <- str_split(y, pattern = "e")[[1]] %>% as.numeric()
-  a <- if_else(z[2] > -10 | z[2] < 10, last(z[2]), z[2])
-  if(z[2]<0){
-    return(glue(z[1],"×10","^",str_replace_all(a, "[[+]]", ""),"^"))
+```{r ScientificTen, include=FALSE}
+# Sourced from FundyPhytoPhysCodeChunks
+ScientificTen <- function(x, sf = 2) {
+  x <- as.numeric(x)
+  if (is.na(x)) {
+    return("NA")
   }
-  else{
-    return(glue(z[1],"×10","^",a,"^"))
+  
+  y <- format(signif(x, sf), scientific = TRUE) %>% as.character()
+  z <- str_split(y, pattern = "e")[[1]]
+  
+  base <- z[1]
+  exponent <- as.numeric(z[2])
+  
+  if (is.na(exponent)) {
+    return("NA")
+  }
+  
+  if (abs(exponent) > 3) {
+    return(paste(base, "× 10^", exponent, "^", sep = ""))
+  } else {
+    return(signif(x, sf))
   }
 }
 ```
