@@ -1,0 +1,10 @@
+---
+bibliography: ["`r file.path('..', 'Docs', 'Manuscript_O2.bib')`", "`r file.path('..', 'Docs', 'RPackages.bib')`", "`r file.path('..', 'Docs', 'FaultyCitations.bib')`"]
+csl: "`r file.path('..', 'Docs', 'plos-one.csl')`"
+editor_options: 
+  markdown: 
+    wrap: 72
+knit: (function(input, encoding) {
+  rmarkdown::render(input,
+                    output_dir = file.path('..', 'Output'))})
+---
