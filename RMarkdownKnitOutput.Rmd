@@ -1,3 +1,5 @@
+
+# add to YAML. The bibliography and cls sections show examples of how to call in .bib or .cls from  folders outside of working directory.  The knit section shows how to knit to an alternate output folder. Note, this code now only knits 1 file type, the first output listed in the YAML.
 ---
 bibliography: ["`r file.path('..', 'Docs', 'Manuscript_O2.bib')`", "`r file.path('..', 'Docs', 'RPackages.bib')`", "`r file.path('..', 'Docs', 'FaultyCitations.bib')`"]
 csl: "`r file.path('..', 'Docs', 'plos-one.csl')`"
