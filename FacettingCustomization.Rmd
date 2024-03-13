@@ -37,4 +37,23 @@ To change the angle of a facet header, use:
 ```{r}
 theme(strip.text.x = element_text(angle = 45))
 ```
+--------------------------------- Plots customizations including legend position (by SySl)-----------------------------
 
+```{r}
+df %>%
+  ggplot() +
+  geom_line(aes(x = Time_h, y = meanOD720_h, colour = as.factor(Strain)), size = 0.5, show.legend = T) +
+  scale_colour_discrete(type=c("seagreen4", "palegreen3", "brown1", "brown4"), name="") +
+  labs(y = "Optical density ("~OD[720]~")", x = "Elapsed time (h)") +
+  ggh4x::facet_nested(cols = vars(facetsPhotoperiod, Photoperiod), rows = vars(facetsPar_ue, Par_ue), labeller = label_parsed) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(), # remove minor grid lines
+        panel.grid.major = element_blank(),  # remove major grid lines
+        axis.text = element_text(size=12), # customize font size on x- and y- axis
+        axis.title = element_text(size=16), # customize font size on x- and y- axis title
+        strip.background = element_rect(fill="white"), # customize colour of facet strip (default gray when using "theme_bw")
+        strip.text = element_text(size=12), # customize font size on the facets strip
+        legend.background = element_rect(fill="transparent"), # customize colour of legend background 
+        legend.position = c(0.12,0.96), # customize legend position 
+        legend.text = element_text(size=11)) # customize font size on legend
+```
