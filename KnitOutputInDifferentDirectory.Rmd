@@ -1,0 +1,7 @@
+---
+knit: (function(input, encoding) {
+  rmarkdown::render(input,
+                    output_dir = file.path('..', 'Output'),
+                    output_format = c("bookdown::word_document2", "bookdown::html_document2"),
+                    clean = TRUE)})
+---
